@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response } from 'express';
 import { fetchTechNews, previewTechNews } from '../controllers/news';
 import { asyncHandler } from '../middleware/errorHandler';
 import { authenticateToken } from '../middleware/auth';
@@ -7,7 +7,7 @@ import newsScheduler from '../services/news/newsScheduler';
 const router: Router = express.Router();
 
 // Public test endpoint (temporary - for development only)
-router.post('/test-fetch', asyncHandler(async (req, res) => {
+router.post('/test-fetch', asyncHandler(async (req: Request, res: Response) => {
   try {
     console.log('🔄 Manual news fetch triggered via /test-fetch endpoint');
     await newsScheduler.runNow();

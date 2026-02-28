@@ -128,7 +128,7 @@ class SearchService {
         prisma.posts.findMany({
           where,
           include: {
-            author: {
+            users: {
               select: {
                 id: true,
                 username: true,
@@ -328,7 +328,7 @@ class SearchService {
       const posts = await prisma.posts.findMany({
         where,
         include: {
-          author: {
+          users: {
             select: {
               id: true,
               username: true,

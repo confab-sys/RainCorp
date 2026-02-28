@@ -8,14 +8,14 @@ export class ReviewService {
   async reviewMilestone(input: CreateMilestoneReviewInput, reviewerId: string) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: input.milestone_id },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.client_id !== reviewerId) {
+    if (milestone.contracts.client_id !== reviewerId) {
       throw new Error('Only the client can review milestones');
     }
 
@@ -69,14 +69,14 @@ export class ReviewService {
   async getReviews(milestoneId: string, userId: string) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: milestoneId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.client_id !== userId && milestone.contract.developer_id !== userId) {
+    if (milestone.contracts.client_id !== userId && milestone.contracts.developer_id !== userId) {
       throw new Error('Unauthorized');
     }
 
@@ -84,7 +84,7 @@ export class ReviewService {
       where: { milestone_id: milestoneId },
       orderBy: { created_at: 'desc' },
       include: {
-        reviewer: { select: { id: true, username: true } }
+        users: { select: { id: true, username: true } }
       }
     });
   }

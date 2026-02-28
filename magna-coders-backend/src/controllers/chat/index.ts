@@ -372,6 +372,11 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    if (!chatId) {
+      res.status(400).json({ success: false, message: 'Chat ID is required' });
+      return;
+    }
+
     // Validate based on message type
     const type = messageType || 'TEXT';
     
@@ -409,16 +414,17 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
         file_size: fileSize || null,
         file_type: fileType || null,
         sender_id: userId,
-        conversation_id: chatId
-      },
-      include: {
-        users: {
-          select: {
-            id: true,
-            username: true,
-            avatar_url: true
-          }
-        }
+        conversation_id: chatId as string
+      }
+    });
+
+    // Fetch sender info
+    const sender = await prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        avatar_url: true
       }
     });
 
@@ -437,7 +443,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       fileSize: message.file_size,
       fileType: message.file_type,
       senderId: message.sender_id,
-      sender: message.users,
+      sender: sender,
       createdAt: message.created_at,
       isRead: message.is_read || false
     });

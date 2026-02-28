@@ -686,7 +686,7 @@ const createProjectTask = async (req: Request, res: Response): Promise<void> => 
     const task = await prisma.project_tasks.create({
       data: {
         id: uuidv4(),
-        project_id: projectId,
+        project_id: projectId as string,
         title,
         description: description || null,
         status: status || 'todo',
@@ -757,6 +757,7 @@ const deleteProjectTask = async (req: Request, res: Response): Promise<void> => 
 
 const uploadProjectFile = async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user as string;
     const { projectId } = req.params;
     const { filename, url, mimeType, size } = req.body;
 
@@ -780,6 +781,7 @@ const uploadProjectFile = async (req: Request, res: Response): Promise<void> => 
         url,
         mime_type: mimeType || 'application/octet-stream',
         size: size || 0,
+        uploaded_by: userId,
       }
     });
 
@@ -787,7 +789,7 @@ const uploadProjectFile = async (req: Request, res: Response): Promise<void> => 
     await prisma.project_attachments.create({
       data: {
         id: uuidv4(),
-        project_id: projectId,
+        project_id: projectId as string,
         file_id: fileId,
       }
     });

@@ -141,14 +141,14 @@ export class EscrowService {
   async releaseMilestone(milestoneId: string, userId: string) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: milestoneId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.client_id !== userId) {
+    if (milestone.contracts.client_id !== userId) {
       throw new Error('Unauthorized');
     }
 
@@ -178,8 +178,8 @@ export class EscrowService {
           contract_id: milestone.contract_id,
           type: EscrowTransactionType.RELEASE,
           amount: milestone.amount,
-          from_id: milestone.contract.client_id,
-          to_id: milestone.contract.developer_id,
+          from_id: milestone.contracts.client_id,
+          to_id: milestone.contracts.developer_id,
           status: EscrowTransactionStatus.SUCCESS
         }
       });
@@ -200,21 +200,21 @@ export class EscrowService {
         }
       });
 
-      if (milestone.contract.developer_id) {
+      if (milestone.contracts.developer_id) {
         const existingWallet = await tx.coin_wallets.findUnique({
-          where: { user_id: milestone.contract.developer_id }
+          where: { user_id: milestone.contracts.developer_id }
         });
 
         if (existingWallet) {
           await tx.coin_wallets.update({
-            where: { user_id: milestone.contract.developer_id },
+            where: { user_id: milestone.contracts.developer_id },
             data: { balance: { increment: net } }
           });
         } else {
           await tx.coin_wallets.create({
             data: {
               id: uuidv4(),
-              user_id: milestone.contract.developer_id,
+              user_id: milestone.contracts.developer_id,
               balance: net,
               max_capacity: 10000,
               status: 'ACTIVE'
@@ -225,7 +225,7 @@ export class EscrowService {
         await tx.coin_transactions.create({
           data: {
             id: uuidv4(),
-            user_id: milestone.contract.developer_id,
+            user_id: milestone.contracts.developer_id,
             type: 'EARNING',
             amount: net,
             direction: 'IN',
@@ -270,7 +270,7 @@ export class EscrowService {
     const escrow = await prisma.escrow_accounts.findUnique({
       where: { contract_id: contractId },
       include: {
-        contract: {
+        contracts: {
           include: {
             escrow_transactions: {
               orderBy: { created_at: 'desc' }
@@ -297,7 +297,7 @@ export class EscrowService {
       refunded_total: Number(escrow.refunded_total),
       available_balance: Number(escrow.funded_total) - Number(escrow.released_total) - Number(escrow.refunded_total),
       status: escrow.status,
-      transactions: escrow.contract.escrow_transactions
+      transactions: escrow.contracts.escrow_transactions
     };
   }
 

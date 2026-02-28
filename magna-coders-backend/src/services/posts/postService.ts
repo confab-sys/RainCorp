@@ -95,7 +95,7 @@ class PostService {
           // For now, we'll assume they're stored directly on posts
         },
         include: {
-          author: {
+          users: {
             select: {
               id: true,
               username: true,
@@ -148,7 +148,7 @@ class PostService {
           ...(authorId && { author_id: authorId })
         },
         include: {
-          author: {
+          users: {
             select: {
               id: true,
               username: true,
@@ -212,7 +212,7 @@ class PostService {
       const post = await prisma.posts.findUnique({
         where: { id },
         include: {
-          author: {
+          users: {
             select: {
               id: true,
               username: true,
@@ -229,7 +229,7 @@ class PostService {
           },
           comments: {
             include: {
-              author: {
+              users: {
                 select: {
                   id: true,
                   username: true,
@@ -324,7 +324,7 @@ class PostService {
           updated_at: new Date()
         },
         include: {
-          author: {
+          users: {
             select: {
               id: true,
               username: true
@@ -437,7 +437,7 @@ class PostService {
           }
         },
         include: {
-          author: {
+          users: {
             select: {
               id: true,
               username: true,

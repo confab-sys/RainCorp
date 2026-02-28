@@ -54,7 +54,7 @@ export class DisputeService {
   async resolve(disputeId: string, input: ResolveDisputeInput) {
     const dispute = await prisma.disputes.findUnique({
       where: { id: disputeId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!dispute) {
@@ -152,8 +152,8 @@ export class DisputeService {
       where: { contract_id: contractId },
       orderBy: { created_at: 'desc' },
       include: {
-        opener: { select: { id: true, username: true } },
-        milestone: { select: { id: true, title: true } }
+        users: { select: { id: true, username: true } },
+        milestones: { select: { id: true, title: true } }
       }
     });
   }
@@ -162,9 +162,9 @@ export class DisputeService {
     const dispute = await prisma.disputes.findUnique({
       where: { id: disputeId },
       include: {
-        contract: true,
-        opener: { select: { id: true, username: true } },
-        milestone: { select: { id: true, title: true } }
+        contracts: true,
+        users: { select: { id: true, username: true } },
+        milestones: { select: { id: true, title: true } }
       }
     });
 
@@ -172,7 +172,7 @@ export class DisputeService {
       throw new Error('Dispute not found');
     }
 
-    if (dispute.contract.client_id !== userId && dispute.contract.developer_id !== userId) {
+    if (dispute.contracts.client_id !== userId && dispute.contracts.developer_id !== userId) {
       throw new Error('Unauthorized');
     }
 

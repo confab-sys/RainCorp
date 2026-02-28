@@ -105,7 +105,7 @@ const getFollowers = async (req: Request, res: Response): Promise<void> => {
     take: limit,
     skip: (page - 1) * limit,
     include: {
-      user: {
+      users_friends_user_idTousers: {
         select: {
           id: true,
           username: true,
@@ -117,7 +117,7 @@ const getFollowers = async (req: Request, res: Response): Promise<void> => {
   });
 
   const formattedFollowers = followers.map(f => ({
-    ...f.user,
+    ...f.users_friends_user_idTousers,
   }));
 
   res.status(200).json(formattedFollowers);
@@ -133,7 +133,7 @@ const getFollowing = async (req: Request, res: Response):Promise<void> => {
     take: limit,
     skip: (page - 1) * limit,
     include: {
-      friendOf: {
+      users_friends_friend_idTousers: {
         select: {
           id: true,
           username: true,
@@ -145,7 +145,7 @@ const getFollowing = async (req: Request, res: Response):Promise<void> => {
   });
 
   const formattedFollowing = following.map(f => ({
-    ...f.friendOf,
+    ...f.users_friends_friend_idTousers,
   }));
 
   res.status(200).json(formattedFollowing);
@@ -204,43 +204,6 @@ const getUserFeed = async (req: Request, res: Response):Promise<void> => {
   res.status(200).json(postsWithCounts);
 };
 
-const getNotifications = async (req: Request, res: Response):Promise<void> => {
-  const userId = req.user as string;
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
-
-  const notifications = await prisma.notifications.findMany({
-    where: { user_id: userId },
-    orderBy: { created_at: 'desc' },
-    take: limit,
-    skip: (page - 1) * limit,
-  });
-
-  // Mark notifications as read
-  await prisma.notifications.updateMany({
-    where: {
-      user_id: userId,
-      is_read: false,
-    },
-    data: { is_read: true }
-  });
-
-  res.status(200).json(notifications);
-};
-
-const getUnreadNotificationCount = async (req: Request, res: Response):Promise<void> => {
-  const userId = req.user as string;
-
-  const count = await prisma.notifications.count({
-    where: {
-      user_id: userId,
-      is_read: false,
-    }
-  });
-
-  res.status(200).json({ count });
-};
-
 const searchUsers = async (req: Request, res: Response):Promise<void> => {
   const { query } = req.query;
   const page = Number(req.query.page) || 1;
@@ -292,77 +255,11 @@ const searchUsers = async (req: Request, res: Response):Promise<void> => {
   res.status(200).json(usersWithCounts);
 };
 
-const markNotificationAsRead = async (req: Request, res: Response): Promise<void> => {
-  const userId = req.user as string;
-  const { notificationId } = req.params;
-
-  const notification = await prisma.notifications.findFirst({
-    where: {
-      id: notificationId,
-      user_id: userId,
-    },
-  });
-
-  if (!notification) {
-    res.status(404).json({ message: 'Notification not found' });
-    return;
-  }
-
-  await prisma.notifications.update({
-    where: { id: notificationId },
-    data: { is_read: true },
-  });
-
-  res.status(200).json({ message: 'Notification marked as read' });
-};
-
-const markAllNotificationsAsRead = async (req: Request, res: Response): Promise<void> => {
-  const userId = req.user as string;
-
-  await prisma.notifications.updateMany({
-    where: {
-      user_id: userId,
-      is_read: false,
-    },
-    data: { is_read: true },
-  });
-
-  res.status(200).json({ message: 'All notifications marked as read' });
-};
-
-const deleteNotification = async (req: Request, res: Response): Promise<void> => {
-  const userId = req.user as string;
-  const { notificationId } = req.params;
-
-  const notification = await prisma.notifications.findFirst({
-    where: {
-      id: notificationId,
-      user_id: userId,
-    },
-  });
-
-  if (!notification) {
-    res.status(404).json({ message: 'Notification not found' });
-    return;
-  }
-
-  await prisma.notifications.delete({
-    where: { id: notificationId },
-  });
-
-  res.status(200).json({ message: 'Notification deleted' });
-};
-
 export {
   followUser,
   unfollowUser,
   getFollowers,
   getFollowing,
   getUserFeed,
-  getNotifications,
-  getUnreadNotificationCount,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
-  deleteNotification,
   searchUsers,
 };

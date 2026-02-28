@@ -43,7 +43,7 @@ export class ActivityLogService {
       orderBy: { created_at: 'desc' },
       take: limit,
       include: {
-        contract: {
+        contracts: {
           select: { id: true, title: true }
         }
       }

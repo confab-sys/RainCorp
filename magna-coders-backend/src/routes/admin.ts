@@ -132,9 +132,9 @@ router.get('/users', async (req, res) => {
           email: true,
           created_at: true,
           availability: true,
-          coinWallet: { select: { balance: true, status: true } },
-          contractsAsClient: { select: { id: true } },
-          contractsAsDeveloper: { select: { id: true } },
+          coin_wallets: { select: { balance: true, status: true } },
+          contracts_contracts_client_idTousers: { select: { id: true } },
+          contracts_contracts_developer_idTousers: { select: { id: true } },
         },
         take: Number(limit),
         skip: Number(offset),
@@ -146,10 +146,10 @@ router.get('/users', async (req, res) => {
     res.json({
       users: users.map((u) => ({
         ...u,
-        wallet_balance: u.coinWallet?.balance?.toNumber() || 0,
-        wallet_status: u.coinWallet?.status || 'NONE',
-        contracts_as_client: u.contractsAsClient.length,
-        contracts_as_developer: u.contractsAsDeveloper.length,
+        wallet_balance: u.coin_wallets?.balance?.toNumber() || 0,
+        wallet_status: u.coin_wallets?.status || 'NONE',
+        contracts_as_client: u.contracts_contracts_client_idTousers.length,
+        contracts_as_developer: u.contracts_contracts_developer_idTousers.length,
       })),
       total,
     });
@@ -170,15 +170,15 @@ router.get('/disputes', async (req, res) => {
       prisma.disputes.findMany({
         where,
         include: {
-          contract: {
+          contracts: {
             select: {
               id: true,
               title: true,
-              client: { select: { id: true, username: true, email: true } },
-              developer: { select: { id: true, username: true, email: true } },
+              users_contracts_client_idTousers: { select: { id: true, username: true, email: true } },
+              users_contracts_developer_idTousers: { select: { id: true, username: true, email: true } },
             },
           },
-          milestone: { select: { id: true, title: true } },
+          milestones: { select: { id: true, title: true } },
         },
         take: Number(limit),
         skip: Number(offset),
@@ -223,8 +223,7 @@ router.get('/coin-orders', async (req, res) => {
       prisma.coin_orders.findMany({
         where,
         include: {
-          user: { select: { id: true, username: true, email: true } },
-          package: true,
+          users: { select: { id: true, username: true, email: true } },
         },
         take: Number(limit),
         skip: Number(offset),
@@ -245,12 +244,12 @@ router.get('/escrow', async (req, res) => {
   try {
     const escrowAccounts = await prisma.escrow_accounts.findMany({
       include: {
-        contract: {
+        contracts: {
           select: {
             id: true,
             title: true,
-            client: { select: { id: true, username: true } },
-            developer: { select: { id: true, username: true } },
+            users_contracts_client_idTousers: { select: { id: true, username: true } },
+            users_contracts_developer_idTousers: { select: { id: true, username: true } },
           },
         },
       },
@@ -277,9 +276,9 @@ router.get('/escrow', async (req, res) => {
 
       return {
         contract_id: e.contract_id,
-        contract_title: e.contract.title,
-        client: e.contract.client,
-        developer: e.contract.developer,
+        contract_title: e.contracts.title,
+        client: e.contracts.users_contracts_client_idTousers?.username || 'N/A',
+        developer: e.contracts.users_contracts_developer_idTousers?.username || 'N/A',
         funded,
         released,
         refunded,

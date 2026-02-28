@@ -22,7 +22,7 @@ export async function adminReleaseFunds(req: Request, res: Response): Promise<vo
 
     const contract = await prisma.contracts.findUnique({
       where: { id: contract_id },
-      include: { escrow_account: true, milestones: { where: { id: milestone_id } } },
+      include: { escrow_accounts: true, milestones: { where: { id: milestone_id } } },
     });
 
     if (!contract) {
@@ -30,12 +30,12 @@ export async function adminReleaseFunds(req: Request, res: Response): Promise<vo
       return;
     }
 
-    if (!contract.escrow_account) {
+    if (!contract.escrow_accounts) {
       res.status(400).json({ error: 'Escrow account not found' });
       return;
     }
 
-    const escrow = contract.escrow_account;
+    const escrow = contract.escrow_accounts;
     const availableFunds = Number(escrow.funded_total) - Number(escrow.released_total);
 
     if (availableFunds < amount) {
@@ -308,7 +308,7 @@ export async function adminResumeContract(req: Request, res: Response): Promise<
 
     const contract = await prisma.contracts.findUnique({
       where: { id },
-      include: { escrow_account: true },
+      include: { escrow_accounts: true },
     });
 
     if (!contract) {
@@ -316,7 +316,7 @@ export async function adminResumeContract(req: Request, res: Response): Promise<
       return;
     }
 
-    const newStatus = contract.escrow_account && Number(contract.escrow_account.funded_total) > 0
+    const newStatus = contract.escrow_accounts && Number(contract.escrow_accounts.funded_total) > 0
       ? 'ACTIVE_FUNDED'
       : 'ACTIVE_UNFUNDED';
 
@@ -372,7 +372,7 @@ export async function adminCancelContract(req: Request, res: Response): Promise<
 
     const contract = await prisma.contracts.findUnique({
       where: { id },
-      include: { escrow_account: true },
+      include: { escrow_accounts: true },
     });
 
     if (!contract) {
@@ -381,10 +381,10 @@ export async function adminCancelContract(req: Request, res: Response): Promise<
     }
 
     await prisma.$transaction(async (tx) => {
-      if (contract.escrow_account) {
-        const availableFunds = Number(contract.escrow_account.funded_total) -
-          Number(contract.escrow_account.released_total) -
-          Number(contract.escrow_account.refunded_total);
+      if (contract.escrow_accounts) {
+        const availableFunds = Number(contract.escrow_accounts.funded_total) -
+          Number(contract.escrow_accounts.released_total) -
+          Number(contract.escrow_accounts.refunded_total);
 
         if (availableFunds > 0) {
           await tx.escrow_accounts.update({
@@ -455,10 +455,10 @@ export async function getAdminContracts(req: Request, res: Response): Promise<vo
       prisma.contracts.findMany({
         where,
         include: {
-          client: { select: { id: true, username: true, email: true } },
-          developer: { select: { id: true, username: true, email: true } },
+          users_contracts_client_idTousers: { select: { id: true, username: true, email: true } },
+          users_contracts_developer_idTousers: { select: { id: true, username: true, email: true } },
           milestones: { select: { id: true, title: true, status: true, amount: true } },
-          escrow_account: true,
+          escrow_accounts: true,
           disputes: { where: { status: 'OPEN' } },
         },
         orderBy: { created_at: 'desc' },

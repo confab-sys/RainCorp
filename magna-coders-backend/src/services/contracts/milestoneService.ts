@@ -43,14 +43,14 @@ export class MilestoneService {
   async update(milestoneId: string, userId: string, input: UpdateMilestoneInput) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: milestoneId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.client_id !== userId) {
+    if (milestone.contracts.client_id !== userId) {
       throw new Error('Unauthorized');
     }
 
@@ -97,14 +97,14 @@ export class MilestoneService {
   async startWork(milestoneId: string, developerId: string) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: milestoneId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.developer_id !== developerId) {
+    if (milestone.contracts.developer_id !== developerId) {
       throw new Error('Unauthorized');
     }
 
@@ -132,14 +132,14 @@ export class MilestoneService {
   async submitForReview(milestoneId: string, developerId: string, summary: string, evidenceItems: any[]) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: milestoneId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.developer_id !== developerId) {
+    if (milestone.contracts.developer_id !== developerId) {
       throw new Error('Unauthorized');
     }
 
@@ -182,14 +182,14 @@ export class MilestoneService {
   async getSubmissions(milestoneId: string, userId: string) {
     const milestone = await prisma.milestones.findUnique({
       where: { id: milestoneId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!milestone) {
       throw new Error('Milestone not found');
     }
 
-    if (milestone.contract.client_id !== userId && milestone.contract.developer_id !== userId) {
+    if (milestone.contracts.client_id !== userId && milestone.contracts.developer_id !== userId) {
       throw new Error('Unauthorized');
     }
 

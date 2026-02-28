@@ -44,7 +44,7 @@ export class ChangeRequestService {
   async accept(changeRequestId: string, userId: string) {
     const changeRequest = await prisma.change_requests.findUnique({
       where: { id: changeRequestId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!changeRequest) {
@@ -55,8 +55,8 @@ export class ChangeRequestService {
       throw new Error('Change request must be pending');
     }
 
-    const isClient = changeRequest.contract.client_id === userId;
-    const isDeveloper = changeRequest.contract.developer_id === userId;
+    const isClient = changeRequest.contracts.client_id === userId;
+    const isDeveloper = changeRequest.contracts.developer_id === userId;
     const isProposer = changeRequest.proposed_by === userId;
 
     if (!isClient && !isDeveloper) {
@@ -96,7 +96,7 @@ export class ChangeRequestService {
   async reject(changeRequestId: string, userId: string) {
     const changeRequest = await prisma.change_requests.findUnique({
       where: { id: changeRequestId },
-      include: { contract: true }
+      include: { contracts: true }
     });
 
     if (!changeRequest) {
@@ -107,8 +107,8 @@ export class ChangeRequestService {
       throw new Error('Change request must be pending');
     }
 
-    const isClient = changeRequest.contract.client_id === userId;
-    const isDeveloper = changeRequest.contract.developer_id === userId;
+    const isClient = changeRequest.contracts.client_id === userId;
+    const isDeveloper = changeRequest.contracts.developer_id === userId;
     const isProposer = changeRequest.proposed_by === userId;
 
     if (!isClient && !isDeveloper) {
@@ -177,7 +177,7 @@ export class ChangeRequestService {
       where: { contract_id: contractId },
       orderBy: { created_at: 'desc' },
       include: {
-        proposer: { select: { id: true, username: true } }
+        users: { select: { id: true, username: true } }
       }
     });
   }

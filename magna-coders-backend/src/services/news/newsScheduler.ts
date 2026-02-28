@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 import newsAggregator from './newsAggregator';
 import { PrismaClient } from '@prisma/client';
 

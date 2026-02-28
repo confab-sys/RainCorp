@@ -107,9 +107,9 @@ export class ContractService {
       where: { id: contractId },
       include: {
         milestones: { orderBy: { order_index: 'asc' } },
-        escrow_account: true,
-        client: { select: { id: true, username: true, email: true } },
-        developer: { select: { id: true, username: true, email: true } }
+        escrow_accounts: true,
+        users_contracts_client_idTousers: { select: { id: true, username: true, email: true } },
+        users_contracts_developer_idTousers: { select: { id: true, username: true, email: true } }
       }
     });
 
@@ -143,9 +143,9 @@ export class ContractService {
       where,
       include: {
         milestones: { orderBy: { order_index: 'asc' } },
-        escrow_account: true,
-        client: { select: { id: true, username: true } },
-        developer: { select: { id: true, username: true } }
+        escrow_accounts: true,
+        users_contracts_client_idTousers: { select: { id: true, username: true } },
+        users_contracts_developer_idTousers: { select: { id: true, username: true } }
       },
       orderBy: { created_at: 'desc' }
     });

@@ -91,13 +91,13 @@ export class StoreService {
 
     const entitlements = await prisma.store_entitlements.findMany({
       where,
-      include: { item: true },
+      include: { store_items: true },
       orderBy: { created_at: 'desc' },
     });
 
     let filtered = entitlements;
     if (options?.type) {
-      filtered = entitlements.filter((e) => e.item.type === options.type);
+      filtered = entitlements.filter((e) => e.store_items.type === options.type);
     }
 
     return filtered.map(this.toEntitlement);
@@ -107,7 +107,7 @@ export class StoreService {
     const entitlement = await prisma.store_entitlements.findFirst({
       where: {
         user_id,
-        item: { type: item_type },
+        store_items: { type: item_type },
         status: EntitlementStatus.ACTIVE,
         OR: [{ ends_at: null }, { ends_at: { gt: new Date() } }],
       },
