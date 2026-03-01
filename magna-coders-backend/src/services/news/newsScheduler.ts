@@ -15,6 +15,7 @@ export class NewsScheduler {
     // Find the magnanews user for posting news
     let systemUser = await prisma.users.findFirst({
       where: { username: 'magnanews' },
+      select: { id: true, username: true },
     });
 
     if (!systemUser) {
