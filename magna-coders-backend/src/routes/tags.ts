@@ -1,9 +1,9 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import { authenticateToken } from '../middleware/auth';
 import { getAllTags, getPopularTags, createTag, getAllCategories } from '../controllers/tags';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 /**
  * @swagger

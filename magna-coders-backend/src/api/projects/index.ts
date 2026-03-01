@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { ProjectsAgent } from '../../AI-assistant/projects-agent/agent';
 
-const router = express.Router();
+const router: Router = express.Router();
 const agent = new ProjectsAgent();
 
 // API endpoint to manage user projects

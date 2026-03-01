@@ -50,7 +50,7 @@ function generateToken(userId: string): string {
       id: userId  // Backward compatibility
     },
     SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '1d' }
   );
 }
 
@@ -111,38 +111,49 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     if (!user) {
       const error: LoginError = {
         code: 'USER_NOT_FOUND',
-        message: 'Invalid username or password',
+        message: 'Invalid credentials. User not found',
         statusCode: 401
       };
-      logger.warn('User not found', { username: credentials.username });
+      logger.warn('User not found', { identifier: credentials.identifier });
       throw error;
     }
 
-    // TODO: Uncomment when password_hash is added to schema
-    // // Verify password
-    // if (!user.password_hash) {
-    //   const error: LoginError = {
-    //     code: 'NO_PASSWORD',
-    //     message: 'Account not properly configured',
-    //     statusCode: 500
-    //   };
-    //   logger.error('No password hash found', error);
-    //   throw error;
-    // }
+    // Verify password hash exists
+    if (!user.password_hash) {
+      const error: LoginError = {
+        code: 'NO_PASSWORD',
+        message: 'Account not properly configured. Please contact support or reset your password',
+        statusCode: 500
+      };
+      logger.error('No password hash found', { userId: user.id });
+      throw error;
+    }
 
-    // const isValidPassword = await bcrypt.compare(credentials.password, user.password_hash);
-    // if (!isValidPassword) {
-    //   const error: LoginError = {
-    //     code: 'INVALID_PASSWORD',
-    //     message: 'Invalid username or password',
-    //     statusCode: 401
-    //   };
-    //   logger.warn('Invalid password', { userId: user.id });
-    //   throw error;
-    // }
+    // Verify password
+    let isValidPassword = false;
+    try {
+      isValidPassword = await bcrypt.compare(credentials.password, user.password_hash);
+    } catch (bcryptError) {
+      const error: LoginError = {
+        code: 'PASSWORD_VERIFICATION_ERROR',
+        message: 'An error occurred while verifying your password. Please try again',
+        statusCode: 500
+      };
+      logger.error('Password verification failed', { userId: user.id, error: bcryptError });
+      throw error;
+    }
 
-    // For now, skip password verification ntawork on it later
-    logger.info('Login successful (password verification skipped)', { userId: user.id });
+    if (!isValidPassword) {
+      const error: LoginError = {
+        code: 'INVALID_PASSWORD',
+        message: 'Invalid credentials. Incorrect password',
+        statusCode: 401
+      };
+      logger.warn('Invalid password attempt', { userId: user.id });
+      throw error;
+    }
+
+    logger.info('Login successful - password verified', { userId: user.id });
 
     // Generate tokens
     const token = generateToken(user.id);

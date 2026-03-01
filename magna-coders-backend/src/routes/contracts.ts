@@ -47,7 +47,7 @@ import {
   getAdminContracts
 } from '../controllers/contracts';
 
-const router = Router();
+const router: Router = Router();
 
 router.use(authenticateToken);
 

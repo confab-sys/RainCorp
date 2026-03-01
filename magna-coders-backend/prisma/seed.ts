@@ -899,6 +899,150 @@ Looking for:
   await Promise.all(projectMembers);
   console.log(`✅ Added project members`);
 
+  // Create friendships
+  console.log('👫 Creating friendships...');
+  const friendships = [];
+  for (let i = 0; i < users.length; i++) {
+    for (let j = i + 1; j < Math.min(i + 3, users.length); j++) {
+      friendships.push(
+        prisma.friends.create({
+          data: {
+            id: uuidv4(),
+            user_id: u[i].id,
+            friend_id: u[j].id,
+            status: 'accepted'
+          }
+        }),
+        // Create reverse friendship
+        prisma.friends.create({
+          data: {
+            id: uuidv4(),
+            user_id: u[j].id,
+            friend_id: u[i].id,
+            status: 'accepted'
+          }
+        })
+      );
+    }
+  }
+
+  await Promise.all(friendships);
+  console.log(`✅ Created ${friendships.length} friendships`);
+
+  // Create conversations (direct messages)
+  console.log('💬 Creating conversations and messages...');
+  const conversations = [];
+  let messageCount = 0;
+
+  // Create a conversation between first two users
+  const conversation1 = await prisma.conversations.create({
+    data: {
+      id: uuidv4(),
+      is_group: false
+    }
+  });
+
+  // Add members to conversation
+  await Promise.all([
+    prisma.conversation_members.create({
+      data: {
+        id: uuidv4(),
+        conversation_id: conversation1.id,
+        user_id: u[0].id
+      }
+    }),
+    prisma.conversation_members.create({
+      data: {
+        id: uuidv4(),
+        conversation_id: conversation1.id,
+        user_id: u[1].id
+      }
+    })
+  ]);
+
+  // Add messages to conversation
+  const messages1 = await Promise.all([
+    prisma.messages.create({
+      data: {
+        id: uuidv4(),
+        content: 'Hey! How are you doing?',
+        message_type: 'TEXT',
+        sender_id: u[0].id,
+        conversation_id: conversation1.id
+      }
+    }),
+    prisma.messages.create({
+      data: {
+        id: uuidv4(),
+        content: 'Doing great! Just finished a project.',
+        message_type: 'TEXT',
+        sender_id: u[1].id,
+        conversation_id: conversation1.id
+      }
+    }),
+    prisma.messages.create({
+      data: {
+        id: uuidv4(),
+        content: 'That sounds awesome! Want to collaborate on something?',
+        message_type: 'TEXT',
+        sender_id: u[0].id,
+        conversation_id: conversation1.id
+      }
+    })
+  ]);
+  conversations.push(conversation1);
+  messageCount += messages1.length;
+
+  // Create another conversation between different users
+  const conversation2 = await prisma.conversations.create({
+    data: {
+      id: uuidv4(),
+      is_group: false
+    }
+  });
+
+  await Promise.all([
+    prisma.conversation_members.create({
+      data: {
+        id: uuidv4(),
+        conversation_id: conversation2.id,
+        user_id: u[2].id
+      }
+    }),
+    prisma.conversation_members.create({
+      data: {
+        id: uuidv4(),
+        conversation_id: conversation2.id,
+        user_id: u[3].id
+      }
+    })
+  ]);
+
+  const messages2 = await Promise.all([
+    prisma.messages.create({
+      data: {
+        id: uuidv4(),
+        content: 'Hello! Interested in this frontend position?',
+        message_type: 'TEXT',
+        sender_id: u[3].id,
+        conversation_id: conversation2.id
+      }
+    }),
+    prisma.messages.create({
+      data: {
+        id: uuidv4(),
+        content: 'Yes, I am! What are the requirements?',
+        message_type: 'TEXT',
+        sender_id: u[2].id,
+        conversation_id: conversation2.id
+      }
+    })
+  ]);
+  conversations.push(conversation2);
+  messageCount += messages2.length;
+
+  console.log(`✅ Created ${conversations.length} conversations with ${messageCount} messages`);
+
   console.log('✨ Database seeding completed successfully!');
   console.log('\n📊 Summary:');
   console.log(`  - Categories: ${categories.length}`);
@@ -911,6 +1055,9 @@ Looking for:
   console.log(`  - Comments: ${comments.length}`);
   console.log(`  - Likes: ${likes.length}`);
   console.log(`  - Project Members: ${projectMembers.length}`);
+  console.log(`  - Friendships: ${friendships.length}`);
+  console.log(`  - Conversations: ${conversations.length}`);
+  console.log(`  - Messages: ${messageCount}`);
 }
 
 main()

@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { DashboardAgent } from '../../AI-assistant/dashboard-agent/agent';
 
-const router = express.Router();
+const router: Router = express.Router();
 const agent = new DashboardAgent();
 
 // API endpoint to manage user dashboard and track projects

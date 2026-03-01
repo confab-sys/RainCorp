@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { UserValidationAgent } from '../../AI-assistant/user-validation-agent/agent';
 
-const router = express.Router();
+const router: Router = express.Router();
 const agent = new UserValidationAgent();
 
 // API endpoint to check user validation

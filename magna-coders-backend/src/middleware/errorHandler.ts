@@ -168,6 +168,17 @@ export const asyncHandler = (fn: Function) => (req: Request, res: Response, next
 
 // 404 handler
 export const notFound = (req: Request, res: Response, next: NextFunction): void => {
-  const error = new AppError(`Not found - ${req.originalUrl}`, 404);
+  let message = `Not found - ${req.originalUrl}`;
+
+  // often the caller has forgotten to include the "/api" prefix; log a hint
+  if (
+    req.originalUrl.startsWith('/auth') ||
+    req.originalUrl.startsWith('/friends') ||
+    req.originalUrl === '/chat'
+  ) {
+    message += ' (did you forget to prefix with "/api"?)';
+  }
+
+  const error = new AppError(message, 404);
   next(error);
 };

@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { PlatformFeeService, AdminService } from '../services/coins';
+import { sanitizeAvailabilityColumn } from '../utils/dbSanitizer';
 
-const router = Router();
+const router: Router = Router();
 const prisma = new PrismaClient();
 
 router.use(authenticateToken);
@@ -112,6 +113,9 @@ router.get('/dashboard/revenue', async (req, res) => {
 // User management
 router.get('/users', async (req, res) => {
   try {
+    // repair any bad availability values before we read the rows
+    await sanitizeAvailabilityColumn();
+
     const { limit = 20, offset = 0, search } = req.query;
 
     const where = search

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { processMentionAsync } from '../../services/magnaAI/mentionHandler';
+import { isUuid } from '../../utils/validators';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,16 @@ const getPosts = async (req: Request, res: Response): Promise<void> => {
 	const limit = Math.max(Number(req.query.limit || 10), 1);
 	const skip = (page - 1) * limit;
 	const { categoryId, authorId, sortBy, postType, tags } = req.query as Record<string, string>;
+
+	// Validate uuid parameters when provided to avoid Prisma P2023 errors
+	if (categoryId && !isUuid(categoryId)) {
+		res.status(400).json({ success: false, message: 'Invalid categoryId format' });
+		return;
+	}
+	if (authorId && !isUuid(authorId)) {
+		res.status(400).json({ success: false, message: 'Invalid authorId format' });
+		return;
+	}
 
 	const where: any = {};
 	if (categoryId) where.category_id = categoryId;

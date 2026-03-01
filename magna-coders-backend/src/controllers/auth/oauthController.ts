@@ -20,8 +20,9 @@ const prisma = new PrismaClient();
 /**
  * OAuth Callback Handler
  * 
- * Processes Google OAuth authentication callbacks from the frontend.
+ * Processes OAuth authentication callbacks from Google and GitHub providers.
  * Verifies OAuth tokens, creates or updates user accounts, and generates JWT tokens.
+ * Supports both providers with consistent user creation and session management.
  * 
  * Requirements:
  * - Requirement 1.1-1.4: OAuth sign-in flow
@@ -33,35 +34,41 @@ const prisma = new PrismaClient();
  */
 
 interface OAuthCallbackBody {
-  provider: string;
+  provider: string; // 'google' or 'github'
   providerAccountId: string;
   accessToken: string;
   refreshToken?: string;
   expiresAt: number;
   tokenType: string;
   scope: string;
-  idToken?: string;
+  idToken?: string; // Only used for Google
   email: string;
   name: string;
   image?: string;
 }
 
 /**
- * Handles OAuth callback from Google authentication
+ * Handles OAuth callback from Google and GitHub authentication
  * 
  * @param req - Express request with OAuth data in body
  * @param res - Express response
  * 
  * Flow:
- * 1. Validate provider is 'google'
- * 2. Verify OAuth token with Google
- * 3. Check token signature, expiration, audience, issuer
- * 4. Find or create user by email
+ * 1. Validate provider is 'google' or 'github'
+ * 2. For Google: Verify OAuth token with Google API (check signature, expiration, audience, issuer)
+ * 3. For GitHub: Trust frontend validation (ID token not applicable)
+ * 4. Find or create user by email and save to database
  * 5. Create or update Account record with encrypted tokens
- * 6. Create Session record
+ * 6. Create Session record for session management
  * 7. Generate JWT access and refresh tokens
  * 8. Log authentication event
  * 9. Return user data and tokens
+ * 
+ * User Creation:
+ * - All users are created with unique username generated from email
+ * - password_hash is set to null for OAuth-only accounts
+ * - Avatar URL is stored from OAuth provider profile picture
+ * - User is saved atomically with Account and Session in transaction
  */
 export async function handleOAuthCallback(req: Request, res: Response): Promise<void> {
   try {
@@ -77,7 +84,8 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
     }
     
     // Validate provider (Requirement 1.1)
-    if (data.provider !== 'google') {
+    const validProviders = ['google', 'github'];
+    if (!validProviders.includes(data.provider)) {
       console.warn('Unsupported OAuth provider attempted:', {
         provider: data.provider,
         ip: req.ip
@@ -93,7 +101,7 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
       
       res.status(400).json({
         success: false,
-        message: 'Unsupported OAuth provider'
+        message: 'Unsupported OAuth provider. Supported providers: google, github'
       });
       return;
     }
@@ -141,89 +149,102 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
     
     const googleClient = new OAuth2Client(oauthConfig.GOOGLE_CLIENT_ID);
     
-    // Verify OAuth token with Google (Requirements 1.3, 6.5, 6.6)
-    if (!data.idToken) {
-      console.warn('Missing ID token in OAuth callback:', {
+    // Verify OAuth token based on provider (Requirements 1.3, 6.5, 6.6)
+    if (data.provider === 'google') {
+      // Google token verification with ID token
+      if (!data.idToken) {
+        console.warn('Missing ID token in Google OAuth callback:', {
+          email: data.email,
+          ip: req.ip
+        });
+        
+        // Log token validation failure
+        await logTokenValidationFailure(
+          req.ip || 'unknown',
+          req.headers['user-agent'] || 'unknown',
+          'Missing ID token',
+          data.email
+        );
+        
+        res.status(401).json({
+          success: false,
+          message: 'Authentication failed'
+        });
+        return;
+      }
+      
+      let payload;
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: data.idToken,
+          audience: oauthConfig.GOOGLE_CLIENT_ID
+        });
+        
+        payload = ticket.getPayload();
+        
+        // Validate token claims (Requirements 6.5, 6.6)
+        if (!payload) {
+          throw new Error('Invalid token payload');
+        }
+        
+        // Validate email matches
+        if (payload.email !== data.email) {
+          throw new Error('Email mismatch');
+        }
+        
+        // Validate audience
+        if (payload.aud !== oauthConfig.GOOGLE_CLIENT_ID) {
+          throw new Error('Invalid audience');
+        }
+        
+        // Validate issuer
+        if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
+          throw new Error('Invalid issuer');
+        }
+        
+      } catch (error: any) {
+        // Map specific OAuth errors to user-friendly messages
+        let userMessage = 'Authentication failed';
+        
+        if (error.message?.includes('Token used too late') || error.message?.includes('expired')) {
+          userMessage = 'Authentication token expired. Please try again.';
+        } else if (error.message?.includes('Invalid token signature')) {
+          userMessage = 'Invalid authentication token. Please try again.';
+        } else if (error.message?.includes('audience') || error.message?.includes('issuer')) {
+          userMessage = 'Authentication failed. Please try again.';
+        }
+        
+        console.error('Google token validation failed:', {
+          error: error.message,
+          type: error.constructor.name,
+          ip: req.ip,
+          email: data.email
+        });
+        
+        // Log token validation failure
+        await logTokenValidationFailure(
+          req.ip || 'unknown',
+          req.headers['user-agent'] || 'unknown',
+          error.message || 'Token validation failed',
+          data.email
+        );
+        
+        res.status(401).json({
+          success: false,
+          message: userMessage
+        });
+        return;
+      }
+    } else if (data.provider === 'github') {
+      // GitHub OAuth - no ID token verification needed, frontend already validated
+      console.log('GitHub OAuth callback received:', {
         email: data.email,
+        login: data.providerAccountId,
         ip: req.ip
       });
       
-      // Log token validation failure
-      await logTokenValidationFailure(
-        req.ip || 'unknown',
-        req.headers['user-agent'] || 'unknown',
-        'Missing ID token',
-        data.email
-      );
-      
-      res.status(401).json({
-        success: false,
-        message: 'Authentication failed'
-      });
-      return;
-    }
-    
-    let payload;
-    try {
-      const ticket = await googleClient.verifyIdToken({
-        idToken: data.idToken,
-        audience: oauthConfig.GOOGLE_CLIENT_ID
-      });
-      
-      payload = ticket.getPayload();
-      
-      // Validate token claims (Requirements 6.5, 6.6)
-      if (!payload) {
-        throw new Error('Invalid token payload');
-      }
-      
-      // Validate email matches
-      if (payload.email !== data.email) {
-        throw new Error('Email mismatch');
-      }
-      
-      // Validate audience
-      if (payload.aud !== oauthConfig.GOOGLE_CLIENT_ID) {
-        throw new Error('Invalid audience');
-      }
-      
-      // Validate issuer
-      if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
-        throw new Error('Invalid issuer');
-      }
-      
-    } catch (error: any) {
-      // Map specific OAuth errors to user-friendly messages
-      let userMessage = 'Authentication failed';
-      
-      if (error.message?.includes('Token used too late') || error.message?.includes('expired')) {
-        userMessage = 'Authentication token expired. Please try again.';
-      } else if (error.message?.includes('Invalid token signature')) {
-        userMessage = 'Invalid authentication token. Please try again.';
-      } else if (error.message?.includes('audience') || error.message?.includes('issuer')) {
-        userMessage = 'Authentication failed. Please try again.';
-      }
-      
-      console.error('Token validation failed:', {
-        error: error.message,
-        type: error.constructor.name,
-        ip: req.ip,
-        email: data.email
-      });
-      
-      // Log token validation failure
-      await logTokenValidationFailure(
-        req.ip || 'unknown',
-        req.headers['user-agent'] || 'unknown',
-        error.message || 'Token validation failed',
-        data.email
-      );
-      
-      res.status(401).json({
-        success: false,
-        message: userMessage
-      });
-      return;
+      // GitHub provides the access token - we'll trust it was validated by frontend
+      // In production, you could validate with GitHub API if needed
     }
     
     // Start transaction for atomic operations (Requirement 2.8, 9.6)
@@ -282,7 +303,7 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
         const existingAccount = await tx.account.findFirst({
           where: {
             user_id: user.id,
-            provider: 'google'
+            provider: data.provider // Dynamic provider from request
           }
         });
         
@@ -314,14 +335,14 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
               data: {
                 id: crypto.randomUUID(),
                 user_id: user.id,
-                provider: 'google', // Requirement 9.1
+                provider: data.provider, // Use provider from request (google or github)
                 provider_account_id: data.providerAccountId,
                 access_token: encryptedAccessToken, // Requirement 2.6, 4.1
                 refresh_token: encryptedRefreshToken,
                 expires_at: new Date(data.expiresAt * 1000), // Requirement 2.7
                 token_type: data.tokenType,
                 scope: data.scope,
-                id_token: encryptedIdToken,
+                id_token: encryptedIdToken, // Will be null for GitHub
                 created_at: new Date(),
                 updated_at: new Date()
               }
@@ -329,7 +350,7 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
           } catch (error: any) {
             // Handle unique constraint violations
             if (error.code === 'P2002') {
-              throw new Error('OAuth account already linked to another user');
+              throw new Error(`${data.provider.charAt(0).toUpperCase() + data.provider.slice(1)} account already linked to another user`);
             }
             throw error;
           }
@@ -342,16 +363,16 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
                 access_token: encryptedAccessToken,
                 refresh_token: encryptedRefreshToken,
                 expires_at: new Date(data.expiresAt * 1000),
-                id_token: encryptedIdToken,
+                id_token: encryptedIdToken, // Will be null for GitHub
                 updated_at: new Date()
               }
             });
           } catch (error: any) {
-            console.error('Failed to update OAuth account:', {
+            console.error(`Failed to update ${data.provider} OAuth account:`, {
               accountId: existingAccount.id,
               error: error.message
             });
-            throw new Error('Failed to update authentication credentials');
+            throw new Error(`Failed to update ${data.provider} authentication credentials`);
           }
         }
         
@@ -383,12 +404,13 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
       // Handle transaction errors with specific messages
       let userMessage = 'Authentication failed';
       let statusCode = 500;
+      const providerName = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
       
       if (error.message?.includes('already exists')) {
         userMessage = 'An account with this email already exists';
         statusCode = 409;
       } else if (error.message?.includes('already linked')) {
-        userMessage = 'This Google account is already linked to another user';
+        userMessage = `This ${providerName} account is already linked to another user`;
         statusCode = 409;
       } else if (error.message?.includes('secure authentication tokens')) {
         userMessage = 'Failed to secure your authentication. Please try again.';
@@ -399,11 +421,12 @@ export async function handleOAuthCallback(req: Request, res: Response): Promise<
         statusCode = 500;
       }
       
-      console.error('OAuth transaction failed:', {
+      console.error(`${providerName} OAuth transaction failed:`, {
         error: error.message,
         code: error.code,
         stack: error.stack,
         email: data.email,
+        provider: data.provider,
         ip: req.ip
       });
       
@@ -591,7 +614,7 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
     
     // Validate email matches (Requirement 3.3)
     if (user.email !== data.email) {
-      console.warn('Email mismatch during OAuth linking:', {
+      console.warn(`Email mismatch during ${data.provider} OAuth linking:`, {
         userId,
         userEmail: user.email,
         oauthEmail: data.email
@@ -606,9 +629,10 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
         data.email
       );
       
+      const providerName = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
       res.status(400).json({
         success: false,
-        message: 'Google account email does not match your registered email'
+        message: `${providerName} account email does not match your registered email`
       });
       return;
     }
@@ -619,12 +643,13 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
       existingAccount = await prisma.account.findFirst({
         where: {
           user_id: userId,
-          provider: 'google'
+          provider: data.provider
         }
       });
     } catch (error: any) {
       console.error('Database error checking existing account:', {
         userId,
+        provider: data.provider,
         error: error.message
       });
       
@@ -645,9 +670,10 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
         data.email
       );
       
+      const providerName = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
       res.status(400).json({
         success: false,
-        message: 'Google account already linked'
+        message: `${providerName} account already linked`
       });
       return;
     }
@@ -684,7 +710,7 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
         data: {
           id: crypto.randomUUID(),
           user_id: userId,
-          provider: 'google',
+          provider: data.provider,
           provider_account_id: data.providerAccountId,
           access_token: encryptedAccessToken,
           refresh_token: encryptedRefreshToken,
@@ -700,10 +726,11 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
       // Handle specific database errors
       let userMessage = 'Failed to link account';
       let statusCode = 500;
+      const providerName = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
       
       if (error.code === 'P2002') {
         // Unique constraint violation
-        userMessage = 'This Google account is already linked to another user';
+        userMessage = `This ${providerName} account is already linked to another user`;
         statusCode = 409;
       } else if (error.code === 'P2003') {
         // Foreign key constraint violation
@@ -711,8 +738,9 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
         statusCode = 404;
       }
       
-      console.error('Database error creating OAuth account link:', {
+      console.error(`Database error creating ${data.provider} OAuth account link:`, {
         userId,
+        provider: data.provider,
         error: error.message,
         code: error.code,
         stack: error.stack
@@ -742,9 +770,10 @@ export async function linkOAuthAccount(req: Request, res: Response): Promise<voi
       data.email
     );
     
+    const providerName = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
     res.status(200).json({
       success: true,
-      message: 'Google account linked successfully'
+      message: `${providerName} account linked successfully`
     });
     
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { sanitizeAvailabilityColumn } from '../../utils/dbSanitizer';
 
 const prisma = new PrismaClient();
 
@@ -8,6 +9,10 @@ const prisma = new PrismaClient();
  */
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
+    // fix any bad rows before attempting the real query; this is cheap and
+    // guards us from the Prisma conversion error seen in production logs.
+    await sanitizeAvailabilityColumn();
+
     const page = Math.max(Number(req.query.page || 1), 1);
     const limit = Math.max(Number(req.query.limit || 10), 1);
     const skip = (page - 1) * limit;
@@ -31,33 +36,71 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
 
     console.log('Fetching users with params:', { page, limit, skip, where });
 
-    const [rawUsers, total] = await Promise.all([
-      prisma.users.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { created_at: 'desc' },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          avatar_url: true,
-          bio: true,
-          location: true,
-          website_url: true,
-          github_url: true,
-          linkedin_url: true,
-          twitter_url: true,
-          whatsapp_url: true,
-          instagram_url: true,
-          availability: true,
-          profile_complete_percentage: true,
-          created_at: true,
-          updated_at: true
-        }
-      }),
-      prisma.users.count({ where })
-    ]);
+    let rawUsers, total;
+    try {
+      [rawUsers, total] = await Promise.all([
+        prisma.users.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { created_at: 'desc' },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            avatar_url: true,
+            bio: true,
+            location: true,
+            website_url: true,
+            github_url: true,
+            linkedin_url: true,
+            twitter_url: true,
+            whatsapp_url: true,
+            instagram_url: true,
+            availability: true,
+            profile_complete_percentage: true,
+            created_at: true,
+            updated_at: true
+          }
+        }),
+        prisma.users.count({ where })
+      ]);
+    } catch (err: any) {
+      // if we hit the conversion error we sanitise again and retry once
+      if (err.code === 'P2032' && err.meta?.field === 'availability') {
+        console.warn('Detected bad availability field while fetching users, attempting repair');
+        await sanitizeAvailabilityColumn();
+        [rawUsers, total] = await Promise.all([
+          prisma.users.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { created_at: 'desc' },
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              avatar_url: true,
+              bio: true,
+              location: true,
+              website_url: true,
+              github_url: true,
+              linkedin_url: true,
+              twitter_url: true,
+              whatsapp_url: true,
+              instagram_url: true,
+              availability: true,
+              profile_complete_percentage: true,
+              created_at: true,
+              updated_at: true
+            }
+          }),
+          prisma.users.count({ where })
+        ]);
+      } else {
+        throw err;
+      }
+    }
     // Normalize availability: convert [] or {} strings to 'available'
     const users = rawUsers.map(u => {
       let availability = (u as any).availability;
@@ -99,27 +142,61 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
   try {
     const { id } = req.params;
 
-    const user = await prisma.users.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        avatar_url: true,
-        bio: true,
-        location: true,
-        website_url: true,
-        github_url: true,
-        linkedin_url: true,
-        twitter_url: true,
-        whatsapp_url: true,
-        instagram_url: true,
-        availability: true,
-        profile_complete_percentage: true,
-        created_at: true,
-        updated_at: true
+    // ensure column is clean before the single-row lookup
+    await sanitizeAvailabilityColumn();
+
+    let user;
+    try {
+      user = await prisma.users.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          avatar_url: true,
+          bio: true,
+          location: true,
+          website_url: true,
+          github_url: true,
+          linkedin_url: true,
+          twitter_url: true,
+          whatsapp_url: true,
+          instagram_url: true,
+          availability: true,
+          profile_complete_percentage: true,
+          created_at: true,
+          updated_at: true
+        }
+      });
+    } catch (err: any) {
+      if (err.code === 'P2032' && err.meta?.field === 'availability') {
+        console.warn('Bad availability value encountered while fetching user by id, repairing and retrying');
+        await sanitizeAvailabilityColumn();
+        user = await prisma.users.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            avatar_url: true,
+            bio: true,
+            location: true,
+            website_url: true,
+            github_url: true,
+            linkedin_url: true,
+            twitter_url: true,
+            whatsapp_url: true,
+            instagram_url: true,
+            availability: true,
+            profile_complete_percentage: true,
+            created_at: true,
+            updated_at: true
+          }
+        });
+      } else {
+        throw err;
       }
-    });
+    }
 
     if (!user) {
       res.status(404).json({

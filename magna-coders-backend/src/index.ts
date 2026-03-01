@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import swaggerUi from 'swagger-ui-express';
 import apiRoutes from './routes';
 import { errorHandler, notFound } from './middleware/errorHandler';
@@ -10,6 +12,7 @@ import { swaggerSpec } from './utils/swagger';
 import { OTPService } from './services';
 import { validateEnv } from './utils/validateEnv';
 import newsScheduler from './services/news/newsScheduler';
+import { initializeSocketIO } from './websocket/socketManager';
 
 // Load environment variables
 dotenv.config();
@@ -41,12 +44,27 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 // API routes
 app.use('/api', apiRoutes);
 
+// initialise db sanitisation helper
+import { sanitizeAvailabilityColumn } from './utils/dbSanitizer';
+
 // Initialize OTP Service and set up periodic cleanup
 const otpService = new OTPService();
 
 // Clean up expired OTPs immediately on startup
 otpService.cleanupExpiredOTPs();
 console.log('🧹 Initial OTP cleanup completed');
+
+// repair any bad availability values before the first request hits the
+// user endpoints; this is fast enough to run on every startup and prevents the
+// P2032 conversion error that was seen in logs.
+(async () => {
+  try {
+    await sanitizeAvailabilityColumn();
+    console.log('🔧 Availability column sanitised');
+  } catch (err) {
+    console.error('🔧 Failed to sanitise availability column on startup', err);
+  }
+})();
 
 // Set up periodic OTP cleanup (every 5 minutes)
 const OTP_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -100,11 +118,24 @@ app.get('/health', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
+// Create HTTP server for WebSocket support
+const httpServer = http.createServer(app);
+
+// Initialize Socket.IO
+const io = new SocketIOServer(httpServer, {
+  cors: { origin: '*', credentials: false },
+  transports: ['websocket', 'polling']
+});
+
+// Initialize Socket event handlers
+initializeSocketIO(io);
+
 // Start server
-app.listen(PORT, () => {
-  console.log(` Magna Coders API Server running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Magna Coders API Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`API docs: http://localhost:${PORT}/api`);
+  console.log(`API docs: http://localhost:${PORT}/api-docs`);
+  console.log(`WebSocket: ws://localhost:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 

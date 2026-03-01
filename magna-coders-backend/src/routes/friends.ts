@@ -139,9 +139,12 @@ router.get('/', asyncHandler(getFriends));
  *         schema:
  *           type: string
  *         required: true
+ *         description: UUID of the user
  *     responses:
  *       200:
  *         description: Friends list retrieved successfully
+ *       400:
+ *         description: Invalid userId format
  *       401:
  *         description: Unauthorized
  */
@@ -161,9 +164,12 @@ router.get('/:userId', asyncHandler(getFriends));
  *         schema:
  *           type: string
  *         required: true
+ *         description: UUID of the other user
  *     responses:
  *       200:
  *         description: Friendship status retrieved
+ *       400:
+ *         description: Invalid user ID format
  *       401:
  *         description: Unauthorized
  */
@@ -183,9 +189,12 @@ router.get('/status/:targetUserId', asyncHandler(checkFriendshipStatus));
  *         schema:
  *           type: string
  *         required: true
+ *         description: UUID of the friend to remove
  *     responses:
  *       200:
  *         description: Unfriended successfully
+ *       400:
+ *         description: Invalid friend ID format
  *       401:
  *         description: Unauthorized
  */

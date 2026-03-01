@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { isUuid } from '../../utils/validators';
 
 const prisma = new PrismaClient();
 
@@ -17,8 +18,8 @@ export const sendFriendRequest = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    if (!receiverId) {
-      res.status(400).json({ success: false, message: 'Receiver ID is required' });
+    if (!receiverId || !isUuid(receiverId)) {
+      res.status(400).json({ success: false, message: 'Valid receiver ID is required' });
       return;
     }
 
@@ -266,8 +267,8 @@ export const getFriends = async (req: Request, res: Response): Promise<void> => 
   try {
     const userId = req.params.userId || req.user;
 
-    if (!userId) {
-      res.status(401).json({ success: false, message: 'Authentication required' });
+    if (!userId || !isUuid(userId)) {
+      res.status(401).json({ success: false, message: 'Authentication required or invalid user ID' });
       return;
     }
 
@@ -340,8 +341,12 @@ export const checkFriendshipStatus = async (req: Request, res: Response): Promis
     const userId = req.user;
     const { targetUserId } = req.params;
 
-    if (!userId) {
+    if (!userId || !isUuid(userId)) {
       res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+    if (!targetUserId || !isUuid(targetUserId)) {
+      res.status(400).json({ success: false, message: 'Valid target user ID is required' });
       return;
     }
 
@@ -397,11 +402,14 @@ export const unfriend = async (req: Request, res: Response): Promise<void> => {
     const userId = req.user;
     const { friendId } = req.params;
 
-    if (!userId) {
+    if (!userId || !isUuid(userId)) {
       res.status(401).json({ success: false, message: 'Authentication required' });
       return;
     }
-
+    if (!friendId || !isUuid(friendId)) {
+      res.status(400).json({ success: false, message: 'Valid friend ID is required' });
+      return;
+    }
     // Delete both friendship records
     await prisma.friends.deleteMany({
       where: {

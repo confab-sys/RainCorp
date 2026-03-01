@@ -9,7 +9,7 @@ import { Router } from 'express';
 import { WalletController, PackageController, StoreController, AdminController } from '../controllers/coins';
 import { authenticateToken } from '../middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 router.use(authenticateToken);
 
