@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { normalizeAvailability } from '../../utils/availability';
 
 const prisma = new PrismaClient();
 
@@ -31,7 +32,7 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
 
     console.log('Fetching users with params:', { page, limit, skip, where });
 
-    const [users, total] = await Promise.all([
+    const [rawUsers, total] = await Promise.all([
       prisma.users.findMany({
         where,
         skip,
@@ -58,6 +59,11 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
       }),
       prisma.users.count({ where })
     ]);
+    // Normalize availability for each user
+    const users = rawUsers.map(u => ({
+      ...u,
+      availability: normalizeAvailability((u as any).availability)
+    }));
 
     console.log(`Found ${users.length} users out of ${total} total`);
     console.log('Users:', users.map(u => ({ username: u.username, email: u.email })));
@@ -121,9 +127,15 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Normalize availability on the returned user
+    const safeUser = {
+      ...user,
+      availability: normalizeAvailability((user as any).availability)
+    };
+
     res.status(200).json({
       success: true,
-      user
+      user: safeUser
     });
   } catch (error: any) {
     console.error('Get user by ID error:', error);

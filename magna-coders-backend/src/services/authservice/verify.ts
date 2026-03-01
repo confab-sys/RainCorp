@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import { normalizeAvailability } from '../../utils/availability';
 import { SECRET } from '../../utils/config';
 
 const prisma = new PrismaClient();
@@ -153,8 +154,19 @@ export async function getUserFromToken(token: string): Promise<UserFromTokenResp
       return null;
     }
 
+    // Normalize availability so callers always receive a string or null
+    const normalizedAvailability = normalizeAvailability((user as any).availability);
+
     logger.info('User retrieved from token', { userId: user.id, username: user.username });
-    return user as UserFromTokenResponse;
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      availability: normalizedAvailability,
+      profile_complete_percentage: (user as any).profile_complete_percentage ?? null
+    } as UserFromTokenResponse;
 
   } catch (error: any) {
     if (error.code && error.statusCode) {
