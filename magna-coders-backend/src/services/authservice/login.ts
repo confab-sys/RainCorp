@@ -89,6 +89,22 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
           { email: credentials.identifier.toLowerCase() },
           { username: { equals: credentials.identifier, mode: 'insensitive' } }
         ]
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        password_hash: true,
+        created_at: true,
+        avatar_url: true,
+        bio: true,
+        location: true,
+        github_url: true,
+        linkedin_url: true,
+        twitter_url: true,
+        whatsapp_url: true,
+        instagram_url: true,
+        profile_complete_percentage: true
       }
     });
 

@@ -61,6 +61,27 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           { email: identifier.toLowerCase() },
           { username: { equals: identifier, mode: 'insensitive' } }
         ]
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        password_hash: true,
+        created_at: true,
+        updated_at: true,
+        profile_complete_percentage: true,
+        avatar_url: true,
+        bio: true,
+        location: true,
+        website_url: true,
+        github_url: true,
+        linkedin_url: true,
+        twitter_url: true,
+        whatsapp_url: true,
+        instagram_url: true,
+        accounts: true,
+        sessions: true,
+        coin_wallets: true
       }
     });
 

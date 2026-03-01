@@ -92,7 +92,8 @@ export async function register(userData: RegisterRequest): Promise<RegisterRespo
           { username: { equals: userData.username, mode: 'insensitive' } },
           { email: userData.email }
         ]
-      }
+      },
+      select: { id: true, username: true, email: true }
     });
 
     if (existingUser) {

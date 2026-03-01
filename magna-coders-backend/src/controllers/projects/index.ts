@@ -231,7 +231,10 @@ const createProject = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const user = await prisma.users.findUnique({ where: { id: userId } });
+  const user = await prisma.users.findUnique({ 
+    where: { id: userId },
+    select: { id: true, username: true, email: true, profile_complete_percentage: true }
+  });
   if (!user) {
     res.status(404).send({ message: 'User not found.' });
     return;
@@ -549,7 +552,10 @@ const addProjectMember = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
-    const user = await prisma.users.findUnique({ where: { id: userId } });
+    const user = await prisma.users.findUnique({ 
+      where: { id: userId },
+      select: { id: true, username: true, email: true }
+    });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;

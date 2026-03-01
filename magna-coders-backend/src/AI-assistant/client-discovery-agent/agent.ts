@@ -63,10 +63,22 @@ export class ClientDiscoveryAgent {
     try {
       const user = await prisma.users.findUnique({
         where: { id: userId },
-        include: {
-          //credits: true,
-          //ratings: true,
-          //feedbacks: true,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          created_at: true,
+          updated_at: true,
+          profile_complete_percentage: true,
+          avatar_url: true,
+          bio: true,
+          location: true,
+          website_url: true,
+          github_url: true,
+          linkedin_url: true,
+          twitter_url: true,
+          whatsapp_url: true,
+          instagram_url: true
         }
       });
 
