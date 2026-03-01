@@ -144,13 +144,20 @@ router.get('/users', async (req, res) => {
     ]);
 
     res.json({
-      users: users.map((u) => ({
-        ...u,
-        wallet_balance: u.coin_wallets?.balance?.toNumber() || 0,
-        wallet_status: u.coin_wallets?.status || 'NONE',
-        contracts_as_client: u.contracts_contracts_client_idTousers.length,
-        contracts_as_developer: u.contracts_contracts_developer_idTousers.length,
-      })),
+      users: users.map((u) => {
+        let availability = (u as any).availability;
+        if (typeof availability === 'string' && (availability === '[]' || availability === '{}')) {
+          availability = 'available';
+        }
+        return {
+          ...u,
+          availability,
+          wallet_balance: u.coin_wallets?.balance?.toNumber() || 0,
+          wallet_status: u.coin_wallets?.status || 'NONE',
+          contracts_as_client: u.contracts_contracts_client_idTousers.length,
+          contracts_as_developer: u.contracts_contracts_developer_idTousers.length,
+        };
+      }),
       total,
     });
   } catch (error) {

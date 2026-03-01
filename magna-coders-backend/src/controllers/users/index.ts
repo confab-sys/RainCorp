@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { normalizeAvailability } from '../../utils/availability';
 
 const prisma = new PrismaClient();
 
@@ -59,11 +58,14 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
       }),
       prisma.users.count({ where })
     ]);
-    // Normalize availability for each user
-    const users = rawUsers.map(u => ({
-      ...u,
-      availability: normalizeAvailability((u as any).availability)
-    }));
+    // Normalize availability: convert [] or {} strings to 'available'
+    const users = rawUsers.map(u => {
+      let availability = (u as any).availability;
+      if (typeof availability === 'string' && (availability === '[]' || availability === '{}')) {
+        availability = 'available';
+      }
+      return { ...u, availability };
+    });
 
     console.log(`Found ${users.length} users out of ${total} total`);
     console.log('Users:', users.map(u => ({ username: u.username, email: u.email })));
@@ -127,10 +129,14 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Normalize availability on the returned user
+    // Normalize availability: convert [] or {} strings to 'available'
+    let availability = (user as any).availability;
+    if (typeof availability === 'string' && (availability === '[]' || availability === '{}')) {
+      availability = 'available';
+    }
     const safeUser = {
       ...user,
-      availability: normalizeAvailability((user as any).availability)
+      availability
     };
 
     res.status(200).json({
